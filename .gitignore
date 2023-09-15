@@ -1,0 +1,4 @@
+*.mp4
+*.pth
+poetry.lock
+Track-Anything/

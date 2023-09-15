@@ -1,0 +1,24 @@
+[tool.poetry]
+name = "gradio-demo"
+version = "0.1.0"
+description = ""
+authors = ["qwertyroiro <roiro8562@gmail.com>"]
+readme = "README.md"
+packages = [{include = "gradio_demo"}]
+
+[tool.poetry.dependencies]
+python = "3.10.12"
+segment-anything = {git = "https://github.com/facebookresearch/segment-anything.git"}
+# torch = "1.13.1"
+# torchvision = "0.14.1"
+torch = { url = "https://download.pytorch.org/whl/cu117/torch-1.13.1%2Bcu117-cp310-cp310-linux_x86_64.whl"}
+torchvision = { url = "https://download.pytorch.org/whl/cu117/torchvision-0.14.1%2Bcu117-cp310-cp310-linux_x86_64.whl"}
+opencv-python = "^4.8.0.76"
+progressbar2 = "^4.2.0"
+gradio = "^3.43.1"
+tqdm = "^4.66.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
