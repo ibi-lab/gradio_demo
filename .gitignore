@@ -2,3 +2,6 @@
 *.pth
 poetry.lock
 Track-Anything/
+configs/__pycache__/__init__.cpython-310.pyc
+configs/__pycache__/ade20k_id2label.cpython-310.pyc
+configs/__pycache__/coco_id2label.cpython-310.pyc

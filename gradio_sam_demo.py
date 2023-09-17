@@ -300,6 +300,7 @@ def ssa_example(img, mask):
             top_1_mask_category = CONFIG_ADE20K_ID2LABEL["id2label"][str(index)]
 
         append_classname = str(top_1_mask_category)
+        return append_classname
         print(append_classname)
     
 
@@ -313,12 +314,14 @@ def sam_example(template_frame, evt:gr.SelectData):
         point_labels=input_label,
         multimask_output=False,
     )
-    ssa_example(template_frame, masks[0])
-    sam_frame = template_frame.copy()
-    mask = np.zeros_like(template_frame)
-    mask[masks[0]] = [255, 0, 0]
-    alpha = 0.5
-    sam_frame = cv2.addWeighted(sam_frame, 1, mask, alpha, 0)
+    label = ssa_example(template_frame, masks[0])
+    sections = [(masks[0], label)]
+    # sam_frame = template_frame.copy()
+    # mask = np.zeros_like(template_frame)
+    # mask[masks[0]] = [255, 0, 0]
+    # alpha = 0.5
+    # sam_frame = cv2.addWeighted(sam_frame, 1, mask, alpha, 0)
+    return (template_frame, sections)
     return gr.update(value=sam_frame, visible=True)
     
 
@@ -331,7 +334,8 @@ with gr.Blocks() as iface:
     # 任意のフレームの画像を表示する
     template_frame = gr.Image(type="numpy",interactive=True, visible=False, image_mode="RGB")
     # SAMで処理した画像を表示する
-    sam_frame = gr.Image(type="numpy",interactive=False, visible=False, image_mode="RGB")
+    # sam_frame = gr.Image(type="numpy",interactive=False, visible=False, image_mode="RGB")
+    img_output = gr.AnnotatedImage(visible=True, interactive=False, label="Output image")
     
     # process buttonが押されたら、get_frame_countにvideoを入力し、get_frame_count内でframe_sliderの
     # maximum、visible、valueを更新する。(outputsは出力であって、入力してないのに、関数内でframe_sliderを更新するのは直感に反するきがする)
@@ -350,7 +354,7 @@ with gr.Blocks() as iface:
     template_frame.select(
         fn=sam_example,
         inputs=[template_frame],
-        outputs=[sam_frame]
+        outputs=[img_output]
     )
     
     
