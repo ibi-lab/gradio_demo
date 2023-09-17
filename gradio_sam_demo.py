@@ -154,11 +154,12 @@ def extract_frame(frame_slider, video_path):
     cap = cv2.VideoCapture(video_path)
     frame_slider -= 1
     cap.set(cv2.CAP_PROP_POS_FRAMES, frame_slider)
+    height, width = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)), int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     ret, frame = cap.read()
     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     # template_frame.update(value=frame, visible=True) # これは動かない inputsにオブジェクト入れても
     # return gr.update(value=frame, visible=True) # これは動く
-    return gr.Image.update(value=frame, visible=True) # これも動く
+    return gr.Image.update(value=frame, visible=True, height=height, width=width) # これも動く
     # return frame # これも動く ただしvisibleなど、他の属性を更新できないから、update使った方がよさげ
 
 # maskからbboxを取得
@@ -174,7 +175,7 @@ def mask_to_bbox(mask):
     bbox = (x_min, y_min, x_max - x_min, y_max - y_min)
     return bbox
     
-
+# imgとmaskを入力し、画像の中に含まれるクラスを1つだけ取得
 def ssa_example(img, mask):
     with torch.no_grad():
         img = img.copy()
@@ -303,7 +304,7 @@ def ssa_example(img, mask):
         return append_classname
         print(append_classname)
     
-
+# SAMで処理した画像を表示する関数
 def sam_example(template_frame, evt:gr.SelectData):
     point = [evt.index[0], evt.index[1]]
     input_point = np.array([point])
@@ -312,30 +313,44 @@ def sam_example(template_frame, evt:gr.SelectData):
     masks, scores, logits = predictor.predict(
         point_coords=input_point,
         point_labels=input_label,
-        multimask_output=False,
+        multimask_output=True,
     )
     label = ssa_example(template_frame, masks[0])
+    print(len(masks))
+    print(masks.shape)
     sections = [(masks[0], label)]
     # sam_frame = template_frame.copy()
     # mask = np.zeros_like(template_frame)
     # mask[masks[0]] = [255, 0, 0]
     # alpha = 0.5
     # sam_frame = cv2.addWeighted(sam_frame, 1, mask, alpha, 0)
-    return (template_frame, sections)
+    # return (template_frame, sections)
+    return gr.update(value=(template_frame, sections), visible=True)
+    return gr.update(value=template_frame, visible=True, )
     return gr.update(value=sam_frame, visible=True)
     
 
 # Gradio UIのセットアップ
 with gr.Blocks() as iface:
-    # ビデオを選択するためのUI
-    video = gr.inputs.Video(type="mp4", label="Input video")
-    # フレームを選択するスライダー
-    frame_slider = gr.Slider(minimum=1, maximum=100, step=1, label="Track start frame", interactive=True, visible=False)
-    # 任意のフレームの画像を表示する
-    template_frame = gr.Image(type="numpy",interactive=True, visible=False, image_mode="RGB")
-    # SAMで処理した画像を表示する
-    # sam_frame = gr.Image(type="numpy",interactive=False, visible=False, image_mode="RGB")
-    img_output = gr.AnnotatedImage(visible=True, interactive=False, label="Output image")
+    state = gr.State({
+        "points": [],
+    })
+    
+    with gr.Row():
+        with gr.Column():
+            # ビデオを選択するためのUI
+            video = gr.inputs.Video(type="mp4", label="Input video")
+            # フレームを選択するスライダー
+            frame_slider = gr.Slider(minimum=1, maximum=100, step=1, label="Track start frame", interactive=True, visible=False)
+        with gr.Column():
+            # 任意のフレームの画像を表示する
+            template_frame = gr.Image(type="numpy",interactive=True, visible=False, image_mode="RGB")
+            # 処理するボタンを表示する
+            process_button = gr.Button(label="Process", type="button", interactive=True)
+            
+            # SAMで処理した画像を表示する
+            # sam_frame = gr.Image(type="numpy",interactive=False, visible=False, image_mode="RGB")
+            img_output = gr.AnnotatedImage(visible=False, interactive=False, label="Output image")
     
     # process buttonが押されたら、get_frame_countにvideoを入力し、get_frame_count内でframe_sliderの
     # maximum、visible、valueを更新する。(outputsは出力であって、入力してないのに、関数内でframe_sliderを更新するのは直感に反するきがする)
