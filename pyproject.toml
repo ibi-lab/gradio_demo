@@ -23,6 +23,7 @@ spacy-loggers="1.0.4"
 transformers="4.27.4"
 scipy="1.10.1"
 mmcv-full = { url = "https://download.openmmlab.com/mmcv/dist/cu117/torch1.13.0/mmcv_full-1.7.1-cp310-cp310-manylinux1_x86_64.whl" }
+av = "^10.0.0"
 
 [build-system]
 requires = ["poetry-core"]

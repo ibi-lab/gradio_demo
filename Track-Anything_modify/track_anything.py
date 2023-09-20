@@ -21,7 +21,7 @@ class TrackingAnything():
         mask, logit, painted_image = self.samcontroler.first_frame_click(image, points, labels, multimask)
         return mask, logit, painted_image
 
-    def generator(self, images: list, template_mask:np.ndarray):
+    def generator(self, images: list, template_mask:np.ndarray, change_color_band=False):
         
         masks = []
         logits = []
@@ -31,12 +31,17 @@ class TrackingAnything():
                 mask, logit, painted_image = self.xmem.track(images[i], template_mask)
                 masks.append(mask)
                 logits.append(logit)
+                import cv2
+                if change_color_band:
+                    painted_image = cv2.cvtColor(painted_image, cv2.COLOR_BGR2RGB)
                 painted_images.append(painted_image)
                 
             else:
                 mask, logit, painted_image = self.xmem.track(images[i])
                 masks.append(mask)
                 logits.append(logit)
+                if change_color_band:
+                    painted_image = cv2.cvtColor(painted_image, cv2.COLOR_BGR2RGB)
                 painted_images.append(painted_image)
         return masks, logits, painted_images
     
