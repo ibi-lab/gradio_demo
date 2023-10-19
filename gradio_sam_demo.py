@@ -462,9 +462,14 @@ def tracking(frame_slider, video, mask_state):
         frames.append(frame)
     cap.release()
 
+    # TrackAnythingのgeneratorにimages=frames(画像郡)、template_mask=mask_state(最初のフレームのマスク情報)を入力する
+    # そうすると、images=framesのすべての画像に対して、最初のフレームのマスク情報をもとに、
+    # マスク情報を返す。painted_imagesはそのマスクを描画した画像郡
     masks, logits, painted_images = model.generator(
         images=frames, template_mask=mask_state, change_color_band=True
     )
+    
+    # masksがPythonリストなので、numpy配列に変える
     masks = np.array(masks)
     print(masks.shape)
     painted_images = np.array(painted_images)
