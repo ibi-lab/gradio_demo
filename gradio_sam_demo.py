@@ -465,6 +465,8 @@ def tracking(frame_slider, video, mask_state):
     masks, logits, painted_images = model.generator(
         images=frames, template_mask=mask_state, change_color_band=True
     )
+    masks = np.array(masks)
+    print(masks.shape)
     painted_images = np.array(painted_images)
 
     frames = torch.from_numpy(np.asarray(painted_images))
@@ -574,4 +576,4 @@ with gr.Blocks() as iface:
     )
 
 
-iface.launch()
+iface.launch(share=True)
