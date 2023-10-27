@@ -111,7 +111,7 @@ def get_noun_phrases(text):
         noun_phrases.append(chunk.text)
     return noun_phrases
 
-
+# ラベル付けをする関数(blip)
 def open_vocabulary_classification_blip(raw_image, blip_processor, blip_model, rank):
     # unconditional image captioning
     captioning_inputs = blip_processor(raw_image, return_tensors="pt").to(rank)
@@ -137,7 +137,7 @@ def clip_classification(image, class_list, top_k, clip_processor, clip_model, ra
         top_k_class_names = [class_list[index] for index in top_k_indices]
         return top_k_class_names
 
-
+# clipsegの関数
 def clipseg_segmentation(image, class_list, clipseg_processor, clipseg_model, rank):
     if isinstance(class_list, str):
         print(len(image), len(class_list))
@@ -173,15 +173,37 @@ def clipseg_segmentation(image, class_list, clipseg_processor, clipseg_model, ra
     return logits
 
 
-# フレーム数取得
 def get_frame_count(video):
+    """入力されたビデオのフレーム数を取得する
+
+    Args:
+        video : ビデオ
+
+    Returns:
+        frame_slider: frame_sliderを更新する
+    """
     cap = cv2.VideoCapture(video)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    # maximum(最大値)、visible(表示するかどうか)、value(初期値)を更新する
     return gr.update(maximum=total_frames, visible=True, value=1)
 
 
-# sliderより、指定したフレームを取得
 def extract_frame(frame_slider, video, template_frame_state, points_state):
+    """frame_sliderの値をもとに、ビデオからフレームを取得する
+
+    Args:
+        frame_slider : フレームのスライダー
+        video : ビデオ
+        template_frame_state : frame_sliderで選択したフレーム
+        points_state : プラス印の座標
+
+    Returns:
+        template_frame: frame_sliderで選択したフレームを更新する
+        template_frame_state: frame_sliderで選択したフレームを保存するgradioのState
+        process_button: SSM処理するボタンを表示する
+        delete_button: プラス印を削除するボタンを表示する
+        points_state: プラス印の座標を保存するgradioのState
+    """
     cap = cv2.VideoCapture(video)
     frame_slider -= 1
     cap.set(cv2.CAP_PROP_POS_FRAMES, frame_slider)
@@ -193,13 +215,18 @@ def extract_frame(frame_slider, video, template_frame_state, points_state):
     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     template_frame_state = frame.copy()
     points_state.clear()
-    # template_frame.update(value=frame, visible=True) # これは動かない inputsにオブジェクト入れても
+    # template_frame.update(value=frame, visible=True) # これは動かない inputs(引数)にtemplate_frameオブジェクト入れても
     # return gr.update(value=frame, visible=True) # これは動く
     return (
+        # value(画像)、visible(表示するかどうか)、height(高さ)、width(幅)を更新する
         gr.Image.update(value=frame, visible=True, height=480, width=860),
+        # フレームのStateを返す
         template_frame_state,
+        # SSM処理するボタンを表示する
         gr.update(visible=True),
+        # プラス印を削除するボタンを表示する
         gr.update(visible=True),
+        # プラス印の座標を保存するgradioのStateを返す
         points_state,
     )  # これも動く
     # return frame # これも動く ただしvisibleなど、他の属性を更新できないから、update使った方がよさげ
@@ -401,9 +428,7 @@ def sam_example(template_frame_state, points_state, mask_state):
 
     print(input_point)
     print(input_label)
-    # point = points[0]
-    # input_point = np.array([point])
-    # input_label = np.array([1])
+
     predictor.set_image(template_frame_state)  # 画像をembeddingにする
     masks, scores, logits = predictor.predict(
         point_coords=input_point,
@@ -413,18 +438,7 @@ def sam_example(template_frame_state, points_state, mask_state):
     mask_state = masks[0]
     label = ssa_example(template_frame_state, masks[0])
     sections = [(masks[0], label)]
-    # sam_frame = template_frame.copy()
-    # mask = np.zeros_like(template_frame)
-    # mask[masks[0]] = [255, 0, 0]
-    # alpha = 0.5
-    # sam_frame = cv2.addWeighted(sam_frame, 1, mask, alpha, 0)
-    # return (template_frame, sections)
     return gr.update(value=(template_frame_state, sections), visible=True), mask_state, gr.update(visible=True)
-    return gr.update(
-        value=template_frame_state,
-        visible=True,
-    )
-    return gr.update(value=sam_frame, visible=True)
 
 
 # 指定されたポイントの座標にプラス印をつける関数
