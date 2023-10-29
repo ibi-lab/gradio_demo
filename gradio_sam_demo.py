@@ -232,8 +232,15 @@ def extract_frame(frame_slider, video, template_frame_state, points_state):
     # return frame # これも動く ただしvisibleなど、他の属性を更新できないから、update使った方がよさげ
 
 
-# maskからbboxを取得
 def mask_to_bbox(mask):
+    """セグメンテーションmaskの上端、下端、左端、右端をbounding boxとして返す
+
+    Args:
+        mask: マスク情報(多分、画像縦横サイズ分のTrue/Falseの組み合わせ)
+
+    Returns:
+        bbox: x(横)軸の最小値、y(縦)軸の最小値、x(横)軸の長さ、y(縦)軸の長さの順のタプル
+    """
     # maskをnumpy配列に変換
     mask = mask.cpu().numpy()
     # maskの非ゼロピクセルの座標を取得
