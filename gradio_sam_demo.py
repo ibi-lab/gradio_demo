@@ -65,8 +65,13 @@ clipseg_processor.image_processor.do_resize = False
 # spacyの初期設定
 nlp = spacy.load("en_core_web_sm")
 
+# XMemの初期設定
+xmem_checkpoint = "./checkpoints/XMem-s012.pth"
+model = TrackingAnything(None, xmem_checkpoint, None, None)
+model.xmem.clear_memory()
 
-# cocoとade20kの関数
+
+# ラベリング処理(cocoとade20k)に使う関数
 def oneformer_coco_segmentation(
     image, oneformer_coco_processor, oneformer_coco_model, rank
 ):
@@ -80,7 +85,6 @@ def oneformer_coco_segmentation(
         )[0]
     )
     return predicted_semantic_map
-
 
 def oneformer_ade20k_segmentation(
     image, oneformer_ade20k_processor, oneformer_ade20k_model, rank
@@ -96,14 +100,7 @@ def oneformer_ade20k_segmentation(
     )
     return predicted_semantic_map
 
-
-# XMemの初期設定
-xmem_checkpoint = "./checkpoints/XMem-s012.pth"
-model = TrackingAnything(None, xmem_checkpoint, None, None)
-model.xmem.clear_memory()
-
-
-# blipのcaptionから名詞句を抽出する関数
+# ラベリング処理(blipのcaptionから名詞句を抽出する)に使う関数
 def get_noun_phrases(text):
     doc = nlp(text)
     noun_phrases = []
@@ -111,7 +108,7 @@ def get_noun_phrases(text):
         noun_phrases.append(chunk.text)
     return noun_phrases
 
-# ラベル付けをする関数(blip)
+# ラベリング処理をする関数(blip)
 def open_vocabulary_classification_blip(raw_image, blip_processor, blip_model, rank):
     # unconditional image captioning
     captioning_inputs = blip_processor(raw_image, return_tensors="pt").to(rank)
@@ -120,8 +117,7 @@ def open_vocabulary_classification_blip(raw_image, blip_processor, blip_model, r
     ov_class_list = get_noun_phrases(caption)
     return ov_class_list
 
-
-# CLIPの関数
+# ラベリング処理のアンサンブルに使うCLIP関数
 def clip_classification(image, class_list, top_k, clip_processor, clip_model, rank):
     inputs = clip_processor(
         text=class_list, images=image, return_tensors="pt", padding=True
@@ -137,7 +133,7 @@ def clip_classification(image, class_list, top_k, clip_processor, clip_model, ra
         top_k_class_names = [class_list[index] for index in top_k_indices]
         return top_k_class_names
 
-# clipsegの関数
+# ラベリング処理のアンサンブルに使うclipsegの関数
 def clipseg_segmentation(image, class_list, clipseg_processor, clipseg_model, rank):
     if isinstance(class_list, str):
         print(len(image), len(class_list))
@@ -174,6 +170,8 @@ def clipseg_segmentation(image, class_list, clipseg_processor, clipseg_model, ra
 
 
 def get_frame_count(video):
+    # inputs=video,
+    # outputs=[frame_slider],
     """入力されたビデオのフレーム数を取得する
 
     Args:
@@ -189,6 +187,8 @@ def get_frame_count(video):
 
 
 def extract_frame(frame_slider, video, template_frame_state, points_state):
+    # inputs=[frame_slider, video, template_frame_state, points_state],
+    # outputs=[template_frame, template_frame_state, process_button, delete_button, points_state],
     """frame_sliderの値をもとに、ビデオからフレームを取得する
 
     Args:
@@ -253,8 +253,16 @@ def mask_to_bbox(mask):
     return bbox
 
 
-# imgとmaskを入力し、画像の中に含まれるクラスを1つだけ取得
 def ssa_example(img, mask):
+    """画像とマスクを入力し、画像の中に含まれるクラスを1つだけ取得
+
+    Args:
+        img: 画像
+        mask: マスク
+
+    Returns:
+        append_classname: 画像の中に含まれるクラス
+    """
     with torch.no_grad():
         img = img.copy()
 
@@ -421,11 +429,23 @@ def ssa_example(img, mask):
 
         append_classname = str(top_1_mask_category)
         return append_classname
-        print(append_classname)
 
 
-# SAMで処理した画像を表示する関数
 def sam_example(template_frame_state, points_state, mask_state):
+    # inputs=[template_frame_state, points_state, mask_state],
+    # outputs=[img_output, mask_state, track_button],
+    """SAMで処理した画像を表示し、マスク情報が入ったstate(以下、マスクstate)を返す
+
+    Args:
+        template_frame_state: SAMに入力する画像
+        points_state: プラス印の座標郡
+        mask_state: マスクstate
+
+    Returns:
+        img_output: SAMで処理した画像
+        mask_state: マスクstate
+        track_button: Trackingのボタンを表示する
+    """
     if len(points_state) > 1:
         input_point = np.array(points_state)
         input_label = np.array([1] * len(points_state))
@@ -443,13 +463,33 @@ def sam_example(template_frame_state, points_state, mask_state):
         multimask_output=False,
     )
     mask_state = masks[0]
+    # ここでラベルを取得する
     label = ssa_example(template_frame_state, masks[0])
     sections = [(masks[0], label)]
-    return gr.update(value=(template_frame_state, sections), visible=True), mask_state, gr.update(visible=True)
+    return (
+        # value(画像とsections(マスク情報とラベル))、visible(表示するかどうか)を更新する
+        gr.update(value=(template_frame_state, sections), visible=True),
+        # マスクstateを返す
+        mask_state,
+        # Trackingのボタンを表示する
+        gr.update(visible=True)
+    )
 
 
-# 指定されたポイントの座標にプラス印をつける関数
 def draw_crosshair(template_frame, points_state, evt: gr.SelectData):
+    # inputs=[template_frame, points_state],
+    # outputs=[template_frame, points_state],
+    """画像フレームで、押下されたポイントの座標にプラス印をつける
+
+    Args:
+        template_frame: プラス印を付ける画像
+        points_state: 現在までに押下されたポイントの座標郡
+        evt: 押下されたポイントの座標(index[0]、index[1]で取得)
+
+    Returns:
+        template_frame: プラス印を付けた画像
+        points_state: 現在までに押下されたポイントの座標郡を更新して返す
+    """
     color = (255, 0, 0)
     size = 15
     thickness = 2
@@ -459,16 +499,54 @@ def draw_crosshair(template_frame, points_state, evt: gr.SelectData):
     img_ = template_frame.copy()
     cv2.line(img_, (x - size, y), (x + size, y), color, thickness)
     cv2.line(img_, (x, y - size), (x, y + size), color, thickness)
-    return gr.update(value=img_, visible=True), points_state
+    return (
+        # value(画像)、visible(表示するかどうか)を更新する
+        gr.update(value=img_, visible=True),
+        # 現在までに押下されたポイントの座標郡を更新して返す
+        points_state
+    )
 
 
 def remove_crosshair(template_frame_state, points_state):
+    # inputs=[template_frame_state, points_state],
+    # outputs=[template_frame, points_state],
+    """プラス印を削除する
+
+    Args:
+        template_frame_state: プラス印がついている画像
+        points_state: プラス印の座標郡
+
+    Returns:
+        template_frame: プラス印を削除した画像
+        points_state: プラス印の座標郡をクリアして返す
+    """
     points_state.clear()
     img_ = template_frame_state.copy()
-    return gr.update(value=img_, visible=True), points_state
+    return (
+        # value(画像)、visible(表示するかどうか)を更新する
+        gr.update(value=img_, visible=True),
+        # プラス印の座標郡をクリアして返す
+        points_state
+    )
 
 
 def tracking(frame_slider, video, mask_state):
+    # inputs=[frame_slider, video, mask_state],
+    # outputs=[track_video],
+    """frame_sliderの値をもとに、ビデオからフレームを取得し、Trackingを行う
+    具体的には、frame_sliderの値のフレームを取得し、そのフレーム時点の画像とマスク情報を与える
+    次に、与えられた画像とマスク情報をもとに、XMemでそのフレーム以降の画像郡(=動画)のマスク情報を推定する
+    推定した情報は、masks(マスク情報(Python配列))、logits(生の予測ベクトル？何にせよ使わない)、painted_images(マスクを描画した画像郡)が返される
+    
+
+    Args:
+        frame_slider: スライダーの値
+        video: 動画
+        mask_state: マスク情報
+
+    Returns:
+        track_video: Trackingの結果を表示する
+    """
     frame_slider -= 1
     model.xmem.clear_memory()
     frames = []
@@ -502,13 +580,19 @@ def tracking(frame_slider, video, mask_state):
         os.makedirs(os.path.dirname(output_path))
     torchvision.io.write_video(output_path, frames, fps=fps, video_codec="libx264")
 
-    return gr.update(value=output_path, visible=True)
+    return (
+        # value(画像)、visible(表示するかどうか)を更新する
+        gr.update(value=output_path, visible=True)
+    )
 
 
 # Gradio UIのセットアップ
 with gr.Blocks() as iface:
+    # プラス印の座標を保存するState
     points_state = gr.State([])
+    # 画像を保存するState
     template_frame_state = gr.State()
+    # マスク情報を保存するState
     mask_state = gr.State()
 
     with gr.Row():  # Rowの中に2つのColumnを配置すると、2列で表示される。このとき、Rowとは画面の上から下まですべての領域を指す
@@ -601,5 +685,5 @@ with gr.Blocks() as iface:
         outputs=[track_video],
     )
 
-
+# Gradio UIを起動
 iface.launch(share=True)
